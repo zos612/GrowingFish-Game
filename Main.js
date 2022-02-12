@@ -1,30 +1,81 @@
+const screenSizeX = 600;
+const screenSizeY = 600;
+const LEFT_END_LINE = -100;
+let RIGHT_END_LINE = screenSizeX + 100;
+const TAG_DEFAULT = 0;
+const TAG_PLAYER = 1;
+const TAG_ENERMY = 2;
+const TAG_UI = 3;
+const MAX_LAYER = 32;
+const GAME_PLAYING = '0';
+const GAME_END = '1';
+
 let img;
 let player;
+let gameResultText;
+let KeyPressPleaseText;
+let winText;
 let enemy = [];
 let objs = [];
-let screenSizeX = 600;
-let screenSizeY = 600;
+let renderObjs = [MAX_LAYER];
 let collisionManager;
 let gId = 0;
+let myFont;
+let score = 0;
+let gameState;
+let isRenderCol = false;
 
-const LEFT_END_LINE = -100;
-const RIGHT_END_LINE = screenSizeX + 100;
-
-function setup() {
+  function setup() {
     createCanvas(screenSizeX, screenSizeY);
     init();
   }
 
   function init(){
-
+    
+    for(let i = 0; i < MAX_LAYER ; i++){
+      renderObjs[i] = [];
+    } 
+    
     collisionManager = new CollisionManager();
     collisionManager.init();
 
     BgImg = loadImage('image/background/waterBG.jpg');
-    player = new Player(screenSizeX / 2, screenSizeY / 2, 30, 20);
 
+    sceneInit();
+  }
+
+  function sceneInit(){
+
+    score = 0;
+    objs = [];
+    player = new Player(screenSizeX / 2, screenSizeY / 2, 30, 20);
     objs.push(player);
 
+    gameResultText = new TextUI();
+    gameResultText.strText = 'GameOver';
+    gameResultText.x = 300;
+    gameResultText.y = 300;
+    gameResultText.scale = 50;
+    gameResultText.horizAlign = CENTER;
+    gameResultText.vertAlign = CENTER;
+    gameResultText.isActive = false;
+    gameResultText.tag = TAG_UI;
+    gameResultText.layer = 30;
+    
+    KeyPressPleaseText = new TextUI();
+    KeyPressPleaseText.strText = 'Key Press Please';
+    KeyPressPleaseText.x = 300;
+    KeyPressPleaseText.y = 350;
+    KeyPressPleaseText.scale = 30;
+    KeyPressPleaseText.horizAlign = CENTER;
+    KeyPressPleaseText.vertAlign = CENTER;
+    KeyPressPleaseText.isActive = false;
+    KeyPressPleaseText.tag = TAG_UI;
+    KeyPressPleaseText.layer = 30;
+
+    objs.push(gameResultText);
+    objs.push(KeyPressPleaseText);
+    
     for(let i = 0; i < 10; i++){
       objs.push(new Enemy(0, 0, 0, 0));
     }
@@ -32,22 +83,39 @@ function setup() {
     objs.forEach(element => {
       element.init();
     });
-
-
   }
   
   function draw() {
-    
     update();
     image(BgImg, 0, 0, screenSizeX, screenSizeY);
 
-    objs.forEach(element => {
-      element.draw();
-    });
-    
+    // // rendering
+    for(let i = 0; i < objs.length ; i++){
+      let curLayer = objs[i].layer;
+      renderObjs[curLayer].push(objs[i]);
+    }
+    for(let i= 0; i <MAX_LAYER; ++i){
+      let layerobjs = renderObjs[i];
+      for(let j=0; j < layerobjs.length; ++j){
+        let renderObj = layerobjs[j]; 
+        if(renderObj.isActive)
+          renderObj.draw();
+
+      }
+    }
+
+    for(let i=0 ;i<MAX_LAYER;++i){
+      renderObjs[i] = [];
+    }
+
+    push();
+    textSize(30);
+    text('Score : ' + score, 30, 50);
+    pop();
+
     collisionManager.update();
 
-
+    // delete event
     objs.forEach(obj => {
       if(obj.isDead == true){
 
@@ -59,6 +127,15 @@ function setup() {
       }
     });
   }
+
+  function keyPressed(){
+    if(gameState == GAME_END){
+      gameState = GAME_PLAYING;
+      sceneInit();
+    }
+  }
+
+  
 
   function update() {
       objs.forEach(element => {
@@ -76,8 +153,34 @@ function setup() {
     return -1;
   }
 
-  class Fish{
+  class GameObject{
+    constructor() {
+      this.x = 0;
+      this.y = 0;
+      this.width = 100;
+      this.height = 100;
+      this.scale = 0;
+      this.tag = TAG_DEFAULT;
+      this.id = gId++;
+      this.isDead = false;
+      this.isActive = true;
+      this.layer = 0;
+    }
+
+    init(){
+  
+    }
+    update(){
+  
+    }
+    collisionObj(obj){
+  
+    }
+  }
+
+  class Fish extends GameObject{
     constructor(x, y, width, height) {
+        super();
         this.x = x;
         this.y = y;
         this.width = width;
@@ -86,10 +189,6 @@ function setup() {
         this.ratioHeight = 2;
         this.speed = 5;
         this.isLeft = true;
-        this.scale = 0;
-        this.tag = 0;
-        this.id = gId++;
-        this.isDead = false;
       }
 
       get minX(){
@@ -110,11 +209,14 @@ function setup() {
       let resultY = this.minY;
       this.width = this.ratioWidth * this.scale;
       this.height = this.ratioHeight * this.scale;
+
+      if(isRenderCol == true){ 
+        push();
+        fill(0,0);
+        rect(resultX, resultY, this.width, this.height);
+        pop();
+      }      
       
-      push();
-      fill(0,0);
-      rect(resultX, resultY, this.width, this.height);
-      pop();
       if(this.isLeft == true){
         push();
         scale(-1, 1);
@@ -134,39 +236,11 @@ function setup() {
   }
 }
 
-class Enemy extends Fish{
-    init(){
-        this.tag = 1;
-        push();
-        this.img = loadImage('image/fish/2.png');
-        imageMode(CENTER);
-        pop();
 
-        let randomPosX = Math.random() * screenSizeX;
-        let randomPosY = Math.random() * screenSizeY;
-        this.scale = Math.random() * 40 + 3;
 
-        this.x = screenSizeX + randomPosX;
-        this.y = randomPosY;
-    }
-
-    update(){
-      if(this.isLeft == true){
-        this.x -= this.speed;
-      }
-      else{
-        this.x += this.speed;
-      }
-      
-      if(this.x < LEFT_END_LINE && this.isLeft == true){
-        this.init();
-      }
-  }
-}
-let cnt = 0;
 class Player extends Fish{
     init(){
-      this.tag = 0;
+      this.tag = TAG_PLAYER;
       push();
       this.img = loadImage('image/fish/1.png');
       imageMode(CENTER);
@@ -177,38 +251,105 @@ class Player extends Fish{
     }
 
     update(){
-        if(keyIsPressed === true){
-          if ( keyCode === UP_ARROW) {
-            this.y -= this.speed;
-          } 
-          if (keyCode === DOWN_ARROW) {
-            this.y += this.speed;
-          }  
-          if (keyCode === LEFT_ARROW) {
-            this.x -= this.speed;
-            this.isLeft = true;
-          }
-          if (keyCode === RIGHT_ARROW) {
-            this.x += this.speed;
-            this.isLeft = false;
+      if(gameState == GAME_END){
+        return;
+      }
 
-          }
-        }
-        
+      if ( keyIsDown(UP_ARROW)) { 
+        this.y -= this.speed;
+      } 
+      if (keyIsDown(DOWN_ARROW)) {
+        this.y += this.speed;
+      }  
+      if (keyIsDown(LEFT_ARROW)) { 
+        this.x -= this.speed;
+        this.isLeft = true;
+      }
+      if (keyIsDown(RIGHT_ARROW)) {
+        this.x += this.speed;
+        this.isLeft = false;
+      }
     }
     collisionObj(obj){
-      if(this.scale > obj.scale){
-        this.scale += 10;
-        obj.isDead = true;
-        
+      if(obj.tag == TAG_ENERMY){
+        if(this.scale > obj.scale){
+          if(score >= 1000){
+            gameResultText.isActive = true;
+            gameResultText.strText = 'Win'; 
+            KeyPressPleaseText.isActive = true;
 
-      }else{
-    
+            gameState = GAME_END; 
+          }else{
+            this.scale += 10;  
+            // obj.isDead = true;  
+            obj.init();
+            score += 1 * this.scale; 
+          }
+        }
+        else{
+          this.isDead = true;
+          gameState = GAME_END;
+          gameResultText.isActive = true;
+          KeyPressPleaseText.isActive = true;
+        }
       }
     }
     
 }
 
+class Enemy extends Fish{
+  init(){
+      let randomImgNum = Math.floor(Math.random() * 4 + 2);
+      this.tag = TAG_ENERMY;
+      push();
+      this.img = loadImage('image/fish/'+ randomImgNum + '.png');
+      imageMode(CENTER);
+      pop();
+
+      let randomPosX = Math.random() * screenSizeX;
+      let randomPosY = Math.random() * screenSizeY;
+      let randomDir = Math.floor(Math.random() * 2);//Math.floor(Math.random() * 2);
+      if(randomDir == 0){
+        this.isLeft = false;
+      }else{
+        this.isLeft = true;
+
+      }
+
+      this.scale = Math.random() * 40 + 3;
+
+      if(this.isLeft){
+        this.x = screenSizeX + randomPosX;
+      }else{
+        this.x = -screenSizeX + randomPosX;
+      }
+      
+      this.y = randomPosY;
+
+  }
+
+  update(){
+
+    if(gameState == GAME_END){
+      return;
+    }
+
+
+    if(this.isLeft == true){
+      this.x -= this.speed;
+    }
+    else{
+      this.x += this.speed;
+    }
+    
+    if(this.x < LEFT_END_LINE && this.isLeft == true){
+      this.init();
+    }
+    else if(this.x > RIGHT_END_LINE && this.isLeft == false){
+      this.init();
+    }
+}
+}
 class CollisionManager {
   init(){
 
@@ -248,11 +389,36 @@ class CollisionManager {
 
 }
 
-class GameManager{
-  init(){
+// class GameManager{
+//   init(){
 
+//   }
+//   update(){
+
+//   }
+// }
+
+class UI extends GameObject{
+  
+  constructor(){
+    super();
+    this.layer = 31;
+  }
+}
+
+class TextUI extends UI{
+  
+  init(){
   }
   update(){
 
+  }
+  draw(){
+    // textFont(myFont);
+    push();
+    textAlign(this.horizAlign, this.vertAlign);
+    textSize(this.scale);
+    text(this.strText, this.x, this.y);
+    pop();
   }
 }
